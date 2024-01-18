@@ -28,6 +28,7 @@ class QNet(models.Model):
         return self.output_layer(x)
 
     def custom_train_step(self, state, target):
+        target = tf.reshape(target, (-1, 1))
         with tf.GradientTape() as tape:
             predictions = self(state, training=True)
             loss = self.compiled_loss(target, predictions)
