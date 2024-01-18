@@ -2,12 +2,15 @@ import gymnasium as gym
 import numpy as np
 from Params import Params
 
-ALPHA = 0.1
+ALPHA = 0.9
 DISCOUNT = 0.9
 GREEDY_EPSILON = 0.5
-GREEDY_DECAY = 0.999
-GREEDY_MIN = 0.03
+GREEDY_MIN = 0.001
 EPOCHS = 5000
+RENDER = True
+DONE = True
+RENDER_MODE = "human" if RENDER else None
+GREEDY_DECAY = 0.001 if DONE else 0.999
 
 simple_map = ["SFFF", "FFHF", "FFFF", "HFFG"]
 
@@ -29,17 +32,18 @@ def get_next_state(state, action):
 
 
 def run_sim():
-    env = gym.make('FrozenLake-v1', desc=simple_map, map_name="4x4", is_slippery=True, render_mode="human")
+    env = gym.make('FrozenLake-v1', desc=simple_map, map_name="4x4", is_slippery=True, render_mode=RENDER_MODE)
     observation = env.observation_space
     action = env.action_space
     # q_lookup = np.zeros((env.observation_space.n, env.action_space.n))
     q_lookup = np.load("q_lookup.npy")
     params = Params(alpha=ALPHA, discount=DISCOUNT, greedy_min=GREEDY_MIN, greedy_decay=GREEDY_DECAY, greedy_epsilon=GREEDY_EPSILON, epochs=EPOCHS)
-    print("Params: ", params)
+    print("Params: ", str(params))
     steps_total = 0
     for i in range(params.epochs):
         state = env.reset()[0]
-        env.render()
+        if RENDER:
+            env.render()
         total_reward = 0
         if i % 100 == 99:
             steps_average = steps_total / 100
@@ -56,11 +60,10 @@ def run_sim():
                 action = np.argmax(q_lookup[state, :])
             next_state, reward, terminated, truncated, info = env.step(action)
             if terminated:
-                # q_lookup[state, action] = reward
                 target = reward
                 total_reward += reward
                 params.decay_greedy()
-                # q_lookup[state, action] = (1 - params.alpha) * q_lookup[state, action] + params.alpha * target
+                q_lookup[state, action] = (1 - params.alpha) * q_lookup[state, action] + params.alpha * target
                 # add number of steps left to goal in this episode to steps_total
                 if reward == 1:
                     steps_total += j
@@ -71,12 +74,12 @@ def run_sim():
                 next_action = np.argmax(q_lookup[next_state, :])
                 target = reward + params.discount * np.max(q_lookup[next_state, next_action])
                 params.decay_greedy()
-                # q_lookup[state, action] = (1 - params.alpha) * q_lookup[state, action] + params.alpha * target
+                q_lookup[state, action] = (1 - params.alpha) * q_lookup[state, action] + params.alpha * target
                 state = next_state
+            print(f"Episode: {i}, Step:{j}, Action:{action}, Greedy:{params.greedy_epsilon}, ")
         # steps_total += 15 - state
         rewards_per_episode.append(total_reward)
-    # with open("q_lookup.txt", "w") as f:
-    #     f.write(str(q_lookup))
+
     np.save("q_lookup.npy", q_lookup)
     np.savetxt("q_lookup.csv", q_lookup, fmt="%0.3f",delimiter=",")
     with open("rewards_per_episode.txt", "w") as f:
