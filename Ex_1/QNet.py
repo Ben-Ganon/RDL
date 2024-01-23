@@ -27,14 +27,17 @@ class QNet(models.Model):
             x = layer(x)
         return self.output_layer(x)
 
-    def custom_train_step(self, state, target):
+    def custom_train_step(self, state, target, action):
         target = tf.reshape(target, (-1, 1))
         with tf.GradientTape() as tape:
-            predictions = self(state, training=True)
+            # get the value after call only for the action taken
+            predictions = tf.gather_nd(self.call(state), action, batch_dims=1)
             loss = self.compiled_loss(target, predictions)
         gradients = tape.gradient(loss, self.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         return loss
+
+
 
 
 
