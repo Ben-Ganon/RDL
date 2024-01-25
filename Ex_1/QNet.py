@@ -1,23 +1,30 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow import keras
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Input, Dense
 
-
-class QNet(models.Model):
+class QNet(Model):
     def __init__(self, layer_sizes, output_size, learning_rate=0.01, optimizer='adam'):
-        super(QNet, self).__init__()
-        self.model_layers = [layers.Dense(size, activation='relu') for size in layer_sizes]
-        self.output_layer = layers.Dense(output_size)
-
+        super().__init__()
+        # initialize the layers with xavier initialization
+        self.model_layers = []
+        self.model_layers.append(Dense(layer_sizes[0], activation='relu', input_shape=(4,),
+                                       kernel_initializer=keras.initializers.GlorotNormal()))
+        for i in range(1, len(layer_sizes)):
+            self.model_layers.append(Dense(layer_sizes[i], activation='relu',
+                                                      kernel_initializer=keras.initializers.GlorotNormal()))
+        # output layer
+        self.output_layer = Dense(output_size, kernel_initializer=keras.initializers.GlorotNormal())
         # Selecting the optimizer
         if optimizer == "adam":
-            self.optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+            self.optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
         elif optimizer == "sgd":
-            self.optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate)
+            self.optimizer = keras.optimizers.SGD(learning_rate=learning_rate)
         elif optimizer == "rmsprop":
-            self.optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+            self.optimizer = keras.optimizers.RMSprop(learning_rate=learning_rate)
         else:
             raise ValueError(f"Optimizer {optimizer} not supported.")
-
+        self.loss_object = keras.losses.MeanSquaredError()
         # Compile the model
         self.compile(optimizer=self.optimizer, loss='mean_squared_error')
 
@@ -27,15 +34,15 @@ class QNet(models.Model):
             x = layer(x)
         return self.output_layer(x)
 
-    def custom_train_step(self, state, target, action):
-        target = tf.reshape(target, (-1, 1))
-        with tf.GradientTape() as tape:
-            # get the value after call only for the action taken
-            predictions = tf.gather_nd(self.call(state), action, batch_dims=1)
-            loss = self.compiled_loss(target, predictions)
-        gradients = tape.gradient(loss, self.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-        return loss
+def custom_train_step(model, state, target, action):
+    with tf.GradientTape() as tape:
+        # get the value after call only for the action taken
+        output = model(state)
+        predictions = tf.gather_nd(output, action, batch_dims=1)
+        loss = model.loss_object(target, predictions)
+    gradients = tape.gradient(loss, model.trainable_variables)
+    model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return loss
 
 
 
