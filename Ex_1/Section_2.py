@@ -4,32 +4,35 @@ import tensorflow as tf
 import random
 from collections import deque
 from QNet import QNet, custom_train_step
-N_REPLAY_SIZE = 10000
-EPISODES = 500
+N_REPLAY_SIZE = 500
+EPISODES = 1000
 LEARNING_RATE = 0.01
 LAYER_NUM = 3
 LAYER_SIZE = 16
 # # Layer size array where first layer size is LAYER_SIZE and each subsequent layer size is current_layer_size/2
 # LAYER_SIZE_ARRAY = [LAYER_SIZE // (2 ** i) for i in range(LAYER_NUM)]
-LAYER_SIZE_ARRAY = [32, 32, 8, 4]
+LAYER_SIZE_ARRAY = [32, 32, 32]
 # LAYER_SIZE_ARRAY = [LAYER_SIZE for i in range(LAYER_NUM)]
-GREEDY_EPSILON = 0.7
-GREEDY_EPSILON_DECAY = 0.9
-MIN_GREEDY_EPSILON = 0.05
+GREEDY_EPSILON = 0.9
+GREEDY_EPSILON_DECAY = 0.5
+MIN_GREEDY_EPSILON = 0
 MAX_ITERATION = 3000
-DISCOUNT = 0.9
-BATCH_SIZE = 1024
-UPDATE_TARGET_EVERY = 5
+DISCOUNT = 0.91
+BATCH_SIZE = 16
+UPDATE_TARGET_EVERY = 6
 REWARD_ITER = 100
-OPTIMIZER = "adam"
+OPTIMIZER = "sgd"
 DO_RENDER = False
-LOAD = False
+LOAD = True
 RENDER_METHOD = "human" if DO_RENDER else None
+VALUE_CHECKPT = "Ex_1/checkpoints/Qnet_values_checkpoint"
+TARGET_CHECKPT = "Ex_1/checkpoints/Qnet_target_checkpoint"
 
 
 def initialize_experience_replay():
     que = deque(maxlen=N_REPLAY_SIZE)
     return que
+
 
 def sample_batch(que, batch_size):
     if len(que) < batch_size:
@@ -46,15 +49,16 @@ def train_agent():
     Qnet_target = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE)
     Qnet_values = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE)
     if LOAD:
-        Qnet_target.load_weights("Qnet_target.weights.h5")
-        Qnet_values.load_weights("Qnet_values.weights.h5")
+        dummy_outputs = Qnet_target.call(np.zeros((1, 4)))
+        dummy_outputs = Qnet_values.call(np.zeros((1, 4)))
+        Qnet_target.load_weights(TARGET_CHECKPT)
+        Qnet_values.load_weights(VALUE_CHECKPT)
 
     print(f"paramters: {LAYER_SIZE_ARRAY}\noptimizer: {OPTIMIZER}\nlearning rate: {LEARNING_RATE}\n"
           f"greedy epsilon: {GREEDY_EPSILON}\ngreedy epsilon decay: {GREEDY_EPSILON_DECAY}\n"
           f"max iterations: {MAX_ITERATION}\ndiscount: {DISCOUNT}\nbatch size: {BATCH_SIZE}\n"
           f"update target every: {UPDATE_TARGET_EVERY}\nreward iteration: {REWARD_ITER}\n"
           f"Replay size: {N_REPLAY_SIZE}\n")
-    dummy_outputs = Qnet_target.call(np.zeros((1, 4)))
     avg_reward = 0
     not_updated_count = 0
     for episode_num in range(EPISODES):
@@ -69,8 +73,8 @@ def train_agent():
             avg_reward /= REWARD_ITER
             print("Average reward for last {} episodes: {}".format(REWARD_ITER, avg_reward))
             avg_reward = 0
-            Qnet_target.save_weights("Qnet_target.weights.h5")
-            Qnet_values.save_weights("Qnet_values.weights.h5")
+            Qnet_target.save_weights(TARGET_CHECKPT)
+            Qnet_values.save_weights(VALUE_CHECKPT)
         iter_reward = 0
         greedy_epsilon = max(MIN_GREEDY_EPSILON, greedy_epsilon * GREEDY_EPSILON_DECAY)
         for iteration in range(MAX_ITERATION):
@@ -113,19 +117,49 @@ def train_agent():
             iterations_done = iteration
             not_updated_count += 1
             if done or truncated:
-                next_state = None
                 break
         print(f"Episode: {episode_num}, Loss: {(avg_loss / (iterations_done)):4.6f}., Epsilon: {greedy_epsilon:1.3f}, "
               f"Reward: {iter_reward}, Que Size: {len(replay_q)}")
+    Qnet_target.save_weights(TARGET_CHECKPT)
+    Qnet_values.save_weights(VALUE_CHECKPT)
     env.close()
 
-if __name__ == "__main__":
-    train_agent()
+def test_agent():
+    env = gym.make('CartPole-v1', render_mode=RENDER_METHOD)
+    observation = env.observation_space
+    action = env.action_space
+    replay_q = initialize_experience_replay()
+    greedy_epsilon = GREEDY_EPSILON
+    Qnet_target = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER,
+                       learning_rate=LEARNING_RATE)
+    Qnet_values = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER,
+                       learning_rate=LEARNING_RATE)
+    dummy_outputs = Qnet_target.call(np.zeros((1, 4)))
+    dummy_outputs = Qnet_values.call(np.zeros((1, 4)))
+    Qnet_target.load_weights(TARGET_CHECKPT)
+    Qnet_values.load_weights(VALUE_CHECKPT)
+    avg_reward = 0
+    for episode_num in range(EPISODES):
+        episode_reward = 0
+        state = env.reset()[0]
+        state = tf.constant(np.reshape(state, (1, 4)))
+        if DO_RENDER:
+            env.render()
+        if episode_num % REWARD_ITER == REWARD_ITER - 1:
+            avg_reward /= REWARD_ITER
+            print("Average reward for last {} episodes: {}".format(REWARD_ITER, avg_reward))
+            avg_reward = 0
+        for iteration in range(MAX_ITERATION):
+            action = np.argmax(Qnet_target.call(state))
+            next_state, reward, done, truncated, _ = env.step(action)
+            iterations_done = iteration
+            if done or truncated:
+                break
+            avg_reward += reward
+            episode_reward += reward
+            next_state = tf.constant(np.reshape(next_state, (1, 4)))
+            state = next_state
+        print(f'Episode: {episode_num}, Reward: {episode_reward}, Iterations: {iterations_done}')
 
-    # replay_array = np.array([replay[0] for replay in replays]).reshape(len(replays), 4)
-    # reward_array = np.array([replay[2] for replay in replays]).reshape(len(replays), 1)
-    # Qnet_outputs = Qnet_values.call(replay_array)
-    # if done:
-    #     y_i = reward
-    # else:
-    #     y_i = reward + DISCOUNT * np.max(Qnet_outputs, axis=1)
+if __name__ == "__main__":
+    test_agent()
