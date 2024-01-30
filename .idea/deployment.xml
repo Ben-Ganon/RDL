@@ -1,85 +1,43 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="omribenh@132.72.65.126:22 password" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
+    <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="bgu_pycharm">
+      <paths name="RDL">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/omribenh/RDL" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath path="&quot;/sise/home/omribenh/RDL/&quot;" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="omribenh@132.72.65.119:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/omribenh/RDL" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="omribenh@132.72.65.119:22 password (4)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+      <paths name="omribenh@132.72.65.126:22 password">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="ganonb@132.72.44.112:22 password">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.44.112:22 password (2)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.44.112:22 password (3)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.44.112:22 password (4)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.44.112:22 password (5)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.44.112:22 password (6)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.45.75:22 password">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.66.157:22 password (3)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="ganonb@132.72.80.124:22 password">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="llama">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="llama (2)">
+      <paths name="omribenh@132.72.65.126:22 password (2)">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
@@ -87,5 +45,6 @@
         </serverdata>
       </paths>
     </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>
