@@ -4,29 +4,36 @@ import tensorflow as tf
 import random
 from collections import deque
 from QNet import QNet, custom_train_step
-N_REPLAY_SIZE = 500
+import csv
+import sys
+N_REPLAY_SIZE = 10000
+RANDOM_REPLAY_SIZE = 1024
 EPISODES = 1000
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.0005
 LAYER_NUM = 3
 LAYER_SIZE = 16
 # # Layer size array where first layer size is LAYER_SIZE and each subsequent layer size is current_layer_size/2
 # LAYER_SIZE_ARRAY = [LAYER_SIZE // (2 ** i) for i in range(LAYER_NUM)]
 LAYER_SIZE_ARRAY = [32, 32, 32]
 # LAYER_SIZE_ARRAY = [LAYER_SIZE for i in range(LAYER_NUM)]
-GREEDY_EPSILON = 0.9
-GREEDY_EPSILON_DECAY = 0.5
-MIN_GREEDY_EPSILON = 0
+GREEDY_EPSILON = 1.0
+GREEDY_EPSILON_DECAY = 0.9
+MIN_GREEDY_EPSILON = 0.01
 MAX_ITERATION = 3000
-DISCOUNT = 0.91
-BATCH_SIZE = 16
-UPDATE_TARGET_EVERY = 6
+DISCOUNT = 0.95
+BATCH_SIZE = 8
+RANDOM_BATCH_SIZE = 8
+UPDATE_TARGET_EVERY = 8
 REWARD_ITER = 100
-OPTIMIZER = "sgd"
+OPTIMIZER = "adam"
 DO_RENDER = False
-LOAD = True
+LOAD = False
 RENDER_METHOD = "human" if DO_RENDER else None
-VALUE_CHECKPT = "Ex_1/checkpoints/Qnet_values_checkpoint"
-TARGET_CHECKPT = "Ex_1/checkpoints/Qnet_target_checkpoint"
+VALUE_CHECKPT = "Ex_1/checkpoints/Qnet_values_checkpoint_final"
+TARGET_CHECKPT = "Ex_1/checkpoints/Qnet_target_checkpoint_final"
+
+train_summary_writer = tf.summary.create_file_writer("Ex_1/section_2_logs")
+tf.random.set_seed(0)
 
 
 def initialize_experience_replay():
@@ -45,6 +52,7 @@ def train_agent():
     observation = env.observation_space
     action = env.action_space
     replay_q = initialize_experience_replay()
+    random_replay_q = initialize_experience_replay()
     greedy_epsilon = GREEDY_EPSILON
     Qnet_target = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE)
     Qnet_values = QNet(layer_sizes=LAYER_SIZE_ARRAY, output_size=action.n, optimizer=OPTIMIZER, learning_rate=LEARNING_RATE)
@@ -59,7 +67,7 @@ def train_agent():
           f"max iterations: {MAX_ITERATION}\ndiscount: {DISCOUNT}\nbatch size: {BATCH_SIZE}\n"
           f"update target every: {UPDATE_TARGET_EVERY}\nreward iteration: {REWARD_ITER}\n"
           f"Replay size: {N_REPLAY_SIZE}\n")
-    avg_reward = 0
+    avg_rewards = []
     not_updated_count = 0
     for episode_num in range(EPISODES):
         state = env.reset()[0]
@@ -70,13 +78,12 @@ def train_agent():
             env.render()
         avg_loss = 0
         if episode_num % REWARD_ITER == REWARD_ITER - 1:
-            avg_reward /= REWARD_ITER
-            print("Average reward for last {} episodes: {}".format(REWARD_ITER, avg_reward))
-            avg_reward = 0
+            # avg_reward /= REWARD_ITER
+            # print("Average reward for last {} episodes: {}".format(REWARD_ITER, avg_reward))
+            # avg_reward = 0
             Qnet_target.save_weights(TARGET_CHECKPT)
             Qnet_values.save_weights(VALUE_CHECKPT)
         iter_reward = 0
-        greedy_epsilon = max(MIN_GREEDY_EPSILON, greedy_epsilon * GREEDY_EPSILON_DECAY)
         for iteration in range(MAX_ITERATION):
             rand = np.random.random()
             if rand < greedy_epsilon:
@@ -84,12 +91,16 @@ def train_agent():
             else:
                 action = np.argmax(Qnet_target.call(state))
             next_state, reward, done, truncated, _ = env.step(action)
-            avg_reward += reward
+
             iter_reward += reward
             # next_state = np.reshape(next_state, (1, 4))
             next_state = tf.constant(np.reshape(next_state, (1, 4)))
+            if len(random_replay_q) < RANDOM_REPLAY_SIZE:
+                random_replay_q.append((state, action, reward, next_state, done))
             replay_q.append((state, action, reward, next_state, done))
             replays = sample_batch(replay_q, BATCH_SIZE)
+            random_replays = sample_batch(random_replay_q, RANDOM_BATCH_SIZE)
+            replays += random_replays
             replay_length = len(replays)
             y_i_array = []
             state_array = []
@@ -118,8 +129,17 @@ def train_agent():
             not_updated_count += 1
             if done or truncated:
                 break
+        greedy_epsilon = max(MIN_GREEDY_EPSILON, greedy_epsilon * GREEDY_EPSILON_DECAY)
+        avg_rewards.append(iter_reward)
+        with train_summary_writer.as_default():
+            tf.summary.scalar('avg_loss', avg_loss / iterations_done, step=episode_num)
+        with train_summary_writer.as_default():
+            tf.summary.scalar('rewards_per_episode', iter_reward, step=episode_num)
+
+        if len(avg_rewards) > 100:
+            avg_rewards.pop(0)
         print(f"Episode: {episode_num}, Loss: {(avg_loss / (iterations_done)):4.6f}., Epsilon: {greedy_epsilon:1.3f}, "
-              f"Reward: {iter_reward}, Que Size: {len(replay_q)}")
+              f"Reward: {iter_reward}, Que Size: {len(replay_q)}, Average Reward: {sum(avg_rewards) / len(avg_rewards):3.0f}")
     Qnet_target.save_weights(TARGET_CHECKPT)
     Qnet_values.save_weights(VALUE_CHECKPT)
     env.close()
@@ -162,4 +182,10 @@ def test_agent():
         print(f'Episode: {episode_num}, Reward: {episode_reward}, Iterations: {iterations_done}')
 
 if __name__ == "__main__":
-    test_agent()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "train":
+            train_agent()
+        elif sys.argv[1] == "test":
+            test_agent()
+        else:
+            raise ValueError("Invalid argument. Please use either 'train' or 'test' as the argument.")
