@@ -21,8 +21,8 @@ GREEDY_EPSILON_DECAY = 0.9
 MIN_GREEDY_EPSILON = 0.01
 MAX_ITERATION = 3000
 DISCOUNT = 0.95
-BATCH_SIZE = 8
-RANDOM_BATCH_SIZE = 8
+BATCH_SIZE = 64
+RANDOM_BATCH_SIZE = 16
 UPDATE_TARGET_EVERY = 8
 REWARD_ITER = 100
 OPTIMIZER = "adam"
@@ -32,7 +32,7 @@ RENDER_METHOD = "human" if DO_RENDER else None
 VALUE_CHECKPT = "Ex_1/checkpoints/Qnet_values_checkpoint_final"
 TARGET_CHECKPT = "Ex_1/checkpoints/Qnet_target_checkpoint_final"
 
-train_summary_writer = tf.summary.create_file_writer("Ex_1/section_2_logs")
+train_summary_writer = tf.summary.create_file_writer("Ex_1/section_2_logs/final")
 tf.random.set_seed(0)
 
 

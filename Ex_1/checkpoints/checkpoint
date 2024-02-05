@@ -1,2 +1,2 @@
-model_checkpoint_path: "Qnet_values_checkpoint_final"
-all_model_checkpoint_paths: "Qnet_values_checkpoint_final"
+model_checkpoint_path: "Qnet_B_checkpoint_final"
+all_model_checkpoint_paths: "Qnet_B_checkpoint_final"

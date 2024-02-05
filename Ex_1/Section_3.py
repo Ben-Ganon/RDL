@@ -9,7 +9,7 @@ import sys
 N_REPLAY_SIZE = 10000
 RANDOM_REPLAY_SIZE = 1024
 EPISODES = 1000
-LEARNING_RATE = 0.0005
+LEARNING_RATE = 0.0007
 LAYER_NUM = 3
 LAYER_SIZE = 16
 # # Layer size array where first layer size is LAYER_SIZE and each subsequent layer size is current_layer_size/2
@@ -21,7 +21,7 @@ GREEDY_EPSILON_DECAY = 0.9
 MIN_GREEDY_EPSILON = 0.01
 MAX_ITERATION = 3000
 DISCOUNT = 0.95
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 RANDOM_BATCH_SIZE = 16
 UPDATE_TARGET_EVERY = 8
 REWARD_ITER = 100
@@ -32,7 +32,7 @@ RENDER_METHOD = "human" if DO_RENDER else None
 A_CHECKPT = "Ex_1/checkpoints/Qnet_A_checkpoint_final"
 B_CHECKPT = "Ex_1/checkpoints/Qnet_B_checkpoint_final"
 
-train_summary_writer = tf.summary.create_file_writer("Ex_1/section_3_logs")
+train_summary_writer = tf.summary.create_file_writer("Ex_1/section_3_logs/final")
 tf.random.set_seed(42)
 
 
