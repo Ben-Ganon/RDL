@@ -24,7 +24,7 @@ value_layer = 12
 
 
 class ValueNetwork:
-    def __init__(self, state_size, learning_rate, name='value_network'):
+    def __init__(self, state_size, learning_rate, name='value_network_Acrobot-v1'):
         self.state_size = state_size
         self.learning_rate = learning_rate
 
@@ -51,7 +51,7 @@ class ValueNetwork:
 
 
 class PolicyNetwork:
-    def __init__(self, state_size, action_size, learning_rate, name='policy_network'):
+    def __init__(self, state_size, action_size, learning_rate, name='policy_network_Acrobot-v1'):
         self.state_size = state_size
         self.action_size = action_size
         self.learning_rate = learning_rate
@@ -153,14 +153,14 @@ def run():
 
     # Initialize the policy network
     tf.reset_default_graph()
-    policy = PolicyNetwork(6, 3, learning_rate)
-    baseline = ValueNetwork(6, learning_rate_baseline)
+    policy = PolicyNetwork(6, 3, learning_rate, name='policy_network_Acrobot-v1')
+    baseline = ValueNetwork(6, learning_rate_baseline, name='value_networkAcrobot-v1')
     # Start training the agent with REINFORCE algorithm
     saver = tf.train.Saver()
     output_layer_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy_network/W3') + \
                         tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy_network/b3')
     with tf.Session() as sess:
-        saver.restore(sess, f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{Restore_name}/{Restore_name}.ckpt")
+        saver.restore(sess,f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{Restore_name}/{Restore_name}.ckpt")
         sess.run(tf.variables_initializer(output_layer_vars))
         solved = False
         Transition = collections.namedtuple("Transition", ["state", "action", "reward", "next_state", "done", "value"])
@@ -233,11 +233,11 @@ def run():
                 _, loss = sess.run([policy.optimizer, policy.loss], feed_dict)
                 feed_dict = {baseline.state: transition.state, baseline.target: total_discounted_return}
                 _, loss = sess.run([baseline.optimizer, baseline.loss], feed_dict)
-            if episode % 50 == 0:
+            if episode % 5000 == 0:
                 saver = tf.train.Saver()
                 save_path = saver.save(sess,
                                        f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}_Finetune/{env.spec.id}_Finetune.ckpt")
-        with open('rewards_baseline.csv', 'w') as f:
+        with open(f'rewards_baseline_{env.spec.id}_finetune.csv', 'w') as f:
             csvwriter = csv.writer(f)
             csvwriter.writerow(avg_reward_history)
 

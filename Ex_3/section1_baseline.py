@@ -11,7 +11,7 @@ tf.disable_v2_behavior()
 print("tf_ver:{}".format(tf.__version__))
 
 # env = gym.make('CartPole-v1')
-render = True
+render = False
 render_mode = "human" if render else None
 # env = gym.make('CartPole-v1', render_mode=render_mode)
 # env = gym.make('Acrobot-v1', render_mode=render_mode)
@@ -24,7 +24,7 @@ value_layer = 12
 
 
 class ValueNetwork:
-    def __init__(self, state_size, learning_rate, name='value_network'):
+    def __init__(self, state_size, learning_rate, name='value_network'+env.spec.id):
         self.state_size = state_size
         self.learning_rate = learning_rate
 
@@ -51,7 +51,7 @@ class ValueNetwork:
 
 
 class PolicyNetwork:
-    def __init__(self, state_size, action_size, learning_rate, name='policy_network'):
+    def __init__(self, state_size, action_size, learning_rate, name='policy_network_'+env.spec.id):
         self.state_size = state_size
         self.action_size = action_size
         self.learning_rate = learning_rate
@@ -109,31 +109,31 @@ def delete_output_padding(state, env):
     return state
 
 
-def reward_mountain_car(state, action, next_State):
+def reward_mountain_car(state, action, next_state, reward):
     position = state[0][0]
     velocity = state[0][1]
-    goal_threshold = 0.45  # This should be the x-position of the flag.
 
-    # Compute the distance to the flag from the current position
-    distance_to_flag = goal_threshold - position
+    reward += np.abs(velocity) * 5
 
-    # Negative reward proportional to the square of action magnitude to discourage large actions
-    action_penalty = -0.1 * (action ** 2)
+    if position == next_state[0][0]:
+        reward += -10
 
-    # Large reward for reaching the goal
-    reward = 100 if position >= goal_threshold else 0
-
-    # Reward for correct direction velocity
-    if position < goal_threshold:
-        reward += velocity if distance_to_flag > 0 else -velocity
-
-    # Combine reward with action penalty and a time penalty
-    reward += action_penalty - 1
-
-    if position == next_State[0][0]:
-        reward -= 1
-
+    if position > 0:
+        reward += 1
+    if position > 0.1:
+        reward += 3
+    if position > 0.2:
+        reward += 5
+    if position > 0.3:
+        reward += 7
+    if position > 0.4:
+        reward += 10
     return reward
+
+
+
+
+
 
 
 def run():
@@ -143,8 +143,8 @@ def run():
         action_size = env.action_space.n
     else:
         action_size = env.action_space.shape[0]
-    max_episodes = 5000
-    max_steps = 501
+    max_episodes = 1500
+    max_steps = 1000
     discount_factor = 0.99
     learning_rate = 0.0004
     learning_rate_baseline = 0.0008
@@ -183,11 +183,12 @@ def run():
                         action = np.array([actions_distribution])
                 else:
                     action = np.random.choice(np.arange(len(actions_distribution)), p=actions_distribution)
-                next_state, reward, done, _, _ = env.step(action)
+                next_state, reward, done, tracked, _ = env.step(action)
+                done = done or tracked
                 next_state = next_state.reshape([1, state_size])
 
                 if env.spec.id == "MountainCarContinuous-v0":
-                    reward = reward_mountain_car(state,action, next_state)
+                    reward = reward_mountain_car(state,action, next_state,reward)
 
                 if render:
                     env.render()
@@ -201,16 +202,15 @@ def run():
                     Transition(state=state, action=action_one_hot, reward=reward, next_state=next_state, done=done,
                                value=value))
                 episode_rewards[episode] += reward
-
                 if done:
                     if episode > 98:
                         # Check if solved
                         average_rewards = np.mean(episode_rewards[(episode - 99):episode + 1])
                         avg_reward_history.append(average_rewards)
                     print(
-                        "Episode {} Reward: {} Average over 100 episodes: {}".format(episode, episode_rewards[episode],
-                                                                                     round(average_rewards, 2)))
-                    if average_rewards > 475:
+                        "Episode {} Reward: {} Average over 100 episodes: {} Step {}".format(episode, episode_rewards[episode],
+                                                                                     round(average_rewards, 2), step))
+                    if episode > max_episodes or (average_rewards > -95 and episode > 100):
                         print(' Solved at episode: ' + str(episode))
                         solved = True
                     break
@@ -231,11 +231,10 @@ def run():
                 _, loss = sess.run([baseline.optimizer, baseline.loss], feed_dict)
             if episode % 50 == 0:
                 saver = tf.train.Saver()
-                save_path = saver.save(sess,
-                                       f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}/{env.spec.id}.ckpt")
-        with open('rewards_baseline.csv', 'w') as f:
-            csvwriter = csv.writer(f)
-            csvwriter.writerow(avg_reward_history)
+                save_path = saver.save(sess,f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}/{env.spec.id}.ckpt")
+        # with open(f'rewards_baseline_{env.spec.id}.csv', 'w') as f:
+        #     csvwriter = csv.writer(f)
+        #     csvwriter.writerow(avg_reward_history)
 
 
 if __name__ == '__main__':

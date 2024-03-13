@@ -11,7 +11,7 @@ tf.disable_v2_behavior()
 print("tf_ver:{}".format(tf.__version__))
 
 # env = gym.make('CartPole-v1')
-render = True
+render = False
 render_mode = "human" if render else None
 # env = gym.make('CartPole-v1', render_mode=render_mode)
 # env = gym.make('Acrobot-v1', render_mode=render_mode)
@@ -143,8 +143,8 @@ def run():
         action_size = env.action_space.n
     else:
         action_size = env.action_space.shape[0]
-    max_episodes = 5000
-    max_steps = 501
+    max_episodes = 1000
+    max_steps = 1000
     discount_factor = 0.99
     learning_rate = 0.0004
     learning_rate_baseline = 0.0008
@@ -153,8 +153,8 @@ def run():
 
     # Initialize the policy network
     tf.reset_default_graph()
-    policy = PolicyNetwork(6, 3, learning_rate)
-    baseline = ValueNetwork(6, learning_rate_baseline)
+    policy = PolicyNetwork(6, 3, learning_rate, name='policy_network_CartPole-v1')
+    baseline = ValueNetwork(6, learning_rate_baseline, name='value_networkCartPole-v1')
     # Start training the agent with REINFORCE algorithm
     saver = tf.train.Saver()
     output_layer_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy_network/W3') + \
@@ -187,7 +187,8 @@ def run():
                         action = np.array([actions_distribution])
                 else:
                     action = np.random.choice(np.arange(len(actions_distribution)), p=actions_distribution)
-                next_state, reward, done, _, _ = env.step(action)
+                next_state, reward, done, tracked, _ = env.step(action)
+                done = done or tracked
                 next_state = next_state.reshape([1, state_size])
 
                 if env.spec.id == "MountainCarContinuous-v0":
@@ -214,7 +215,7 @@ def run():
                     print(
                         "Episode {} Reward: {} Average over 100 episodes: {}".format(episode, episode_rewards[episode],
                                                                                      round(average_rewards, 2)))
-                    if average_rewards > 475:
+                    if step >= 900 and done and not tracked:
                         print(' Solved at episode: ' + str(episode))
                         solved = True
                     break
@@ -237,7 +238,7 @@ def run():
                 saver = tf.train.Saver()
                 save_path = saver.save(sess,
                                        f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}_Finetune/{env.spec.id}_Finetune.ckpt")
-        with open('rewards_baseline.csv', 'w') as f:
+        with open('rewards_baseline_MountainCarContinuous-v0_finetune.csv', 'w') as f:
             csvwriter = csv.writer(f)
             csvwriter.writerow(avg_reward_history)
 

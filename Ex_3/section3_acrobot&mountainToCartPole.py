@@ -5,83 +5,24 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 import collections
 import csv
+from section1_baseline import PolicyNetwork, ValueNetwork
 
 # optimized for Tf2
 tf.disable_v2_behavior()
 print("tf_ver:{}".format(tf.__version__))
 
 # env = gym.make('CartPole-v1')
-render = True
+render = False
 render_mode = "human" if render else None
-# env = gym.make('CartPole-v1', render_mode=render_mode)
+env = gym.make('CartPole-v1', render_mode=render_mode)
 # env = gym.make('Acrobot-v1', render_mode=render_mode)
-env = gym.make('MountainCarContinuous-v0', render_mode=render_mode)
+# env = gym.make('MountainCarContinuous-v0', render_mode=render_mode)
 np.random.seed(42)
 tf.set_random_seed(42)
 
 policy_layer = 12
 value_layer = 12
 transfer_layer = 36
-
-
-class ValueNetwork:
-    def __init__(self, state_size, learning_rate, name='value_network'):
-        self.state_size = state_size
-        self.learning_rate = learning_rate
-
-        with tf.variable_scope(name):
-            self.state = tf.placeholder(tf.float32, [None, self.state_size], name="state")
-            self.target = tf.placeholder(tf.float32, name="target")
-
-            tf2_initializer = tf.keras.initializers.glorot_normal(seed=0)
-            self.W1 = tf.get_variable("W1", [self.state_size, value_layer], initializer=tf2_initializer)
-            self.b1 = tf.get_variable("b1", [value_layer], initializer=tf2_initializer)
-            self.W2 = tf.get_variable("W2", [value_layer, value_layer], initializer=tf2_initializer)
-            self.b2 = tf.get_variable("b2", [value_layer], initializer=tf2_initializer)
-            self.W3 = tf.get_variable("W3", [value_layer, 1], initializer=tf2_initializer)
-            self.b3 = tf.get_variable("b3", [1], initializer=tf2_initializer)
-
-            self.Z1 = tf.add(tf.matmul(self.state, self.W1), self.b1)
-            self.A1 = tf.nn.relu(self.Z1)
-            self.Z2 = tf.add(tf.matmul(self.A1, self.W2), self.b2)
-            self.A2 = tf.nn.relu(self.Z2)
-            self.output = tf.add(tf.matmul(self.A2, self.W3), self.b3)
-
-            self.loss = tf.reduce_mean(tf.square(self.target - self.output))
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
-
-
-class PolicyNetwork:
-    def __init__(self, state_size, action_size, learning_rate, name='policy_network'):
-        self.state_size = state_size
-        self.action_size = action_size
-        self.learning_rate = learning_rate
-
-        with tf.variable_scope(name):
-            self.state = tf.placeholder(tf.float32, [None, self.state_size], name="state")
-            self.action = tf.placeholder(tf.int32, [self.action_size], name="action")
-            self.R_t = tf.placeholder(tf.float32, name="total_rewards")
-
-            tf2_initializer = tf.keras.initializers.glorot_normal(seed=0)
-            self.W1 = tf.get_variable("W1", [self.state_size, policy_layer], initializer=tf2_initializer)
-            self.b1 = tf.get_variable("b1", [policy_layer], initializer=tf2_initializer)
-            self.W2 = tf.get_variable("W2", [policy_layer, policy_layer], initializer=tf2_initializer)
-            self.b2 = tf.get_variable("b2", [policy_layer], initializer=tf2_initializer)
-            self.W3 = tf.get_variable("W3", [policy_layer, self.action_size], initializer=tf2_initializer)
-            self.b3 = tf.get_variable("b3", [self.action_size], initializer=tf2_initializer)
-
-            self.Z1 = tf.add(tf.matmul(self.state, self.W1), self.b1)
-            self.A1 = tf.nn.relu(self.Z1)
-            self.Z2 = tf.add(tf.matmul(self.A1, self.W2), self.b2)
-            self.A2 = tf.nn.relu(self.Z2)
-            self.output = tf.add(tf.matmul(self.A2, self.W3), self.b3)
-
-            # Softmax probability distribution over actions
-            self.actions_distribution = tf.squeeze(tf.nn.softmax(self.output))
-            # Loss with negative log probability
-            self.neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.output, labels=self.action)
-            self.loss = tf.reduce_mean(self.neg_log_prob * self.R_t)
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
 
 class TransferPolicyNetwork:
@@ -94,20 +35,60 @@ class TransferPolicyNetwork:
             self.state = tf.placeholder(tf.float32, [None, self.state_size], name="state")
             self.action = tf.placeholder(tf.int32, [self.action_size], name="action")
             self.R_t = tf.placeholder(tf.float32, name="total_rewards")
-            self.T1 = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer1")
-            self.T2 = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer2")
+            self.Transfer = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer")
 
             tf2_initializer = tf.keras.initializers.glorot_normal(seed=0)
             self.W1 = tf.get_variable("W1", [self.state_size, policy_layer], initializer=tf2_initializer)
             self.b1 = tf.get_variable("b1", [policy_layer], initializer=tf2_initializer)
-            self.W2 = tf.get_variable("W2", [transfer_layer, policy_layer], initializer=tf2_initializer)
+            self.W2 = tf.get_variable("W2", [policy_layer, policy_layer], initializer=tf2_initializer)
             self.b2 = tf.get_variable("b2", [policy_layer], initializer=tf2_initializer)
-            self.W3 = tf.get_variable("W3", [transfer_layer, self.action_size], initializer=tf2_initializer)
+            self.W3 = tf.get_variable("W3", [policy_layer + transfer_layer, self.action_size], initializer=tf2_initializer)
             self.b3 = tf.get_variable("b3", [self.action_size], initializer=tf2_initializer)
 
             self.Z1 = tf.add(tf.matmul(self.state, self.W1), self.b1)
             self.A1 = tf.nn.relu(self.Z1)
+            self.Z2 = tf.add(tf.matmul(self.A1, self.W2), self.b2)
+            self.A2 = tf.nn.relu(self.Z2)
+            concat = tf.concat([self.A2, self.Transfer], 1)
+            self.output = tf.add(tf.matmul(concat, self.W3), self.b3)
 
+            # Softmax probability distribution over actions
+            self.actions_distribution = tf.squeeze(tf.nn.softmax(self.output))
+            # Loss with negative log probability
+            self.neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.output, labels=self.action)
+            self.loss = tf.reduce_mean(self.neg_log_prob * self.R_t)
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
+
+
+class TransferValueNetwork:
+    def __init__(self, state_size, learning_rate, name='transfer_value_network'):
+        self.state_size = state_size
+        self.learning_rate = learning_rate
+
+        with tf.variable_scope(name):
+            self.state = tf.placeholder(tf.float32, [None, self.state_size], name="state")
+            self.target = tf.placeholder(tf.float32, name="target")
+            self.Transfer = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer")
+
+            tf2_initializer = tf.keras.initializers.glorot_normal(seed=0)
+            self.W1 = tf.get_variable("W1", [self.state_size, value_layer], initializer=tf2_initializer)
+            self.b1 = tf.get_variable("b1", [value_layer], initializer=tf2_initializer)
+            self.W2 = tf.get_variable("W2", [value_layer, value_layer], initializer=tf2_initializer)
+            self.b2 = tf.get_variable("b2", [value_layer], initializer=tf2_initializer)
+            self.W3 = tf.get_variable("W3", [value_layer + transfer_layer, 1], initializer=tf2_initializer)
+            self.b3 = tf.get_variable("b3", [1], initializer=tf2_initializer)
+
+            self.Z1 = tf.add(tf.matmul(self.state, self.W1), self.b1)
+            self.A1 = tf.nn.relu(self.Z1)
+            self.Z2 = tf.add(tf.matmul(self.A1, self.W2), self.b2)
+            self.A2 = tf.nn.relu(self.Z2)
+            concat = tf.concat([self.A2, self.Transfer], 1)
+            self.output = tf.add(tf.matmul(concat, self.W3), self.b3)
+
+
+            # Loss with negative log probability
+            self.loss = tf.reduce_mean(tf.square(self.target - self.output))
+            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
 
 def state_zero_padding(state, env):
@@ -180,89 +161,113 @@ def run():
 
     # Initialize the policy network
     tf.reset_default_graph()
-    policy = PolicyNetwork(6, 3, learning_rate)
-    baseline = ValueNetwork(6, learning_rate_baseline)
-    # Start training the agent with REINFORCE algorithm
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
-        solved = False
-        Transition = collections.namedtuple("Transition", ["state", "action", "reward", "next_state", "done", "value"])
-        episode_rewards = np.zeros(max_episodes)
-        average_rewards = 0.0
-        avg_reward_history = []
+    policy = TransferPolicyNetwork(6, 3, learning_rate)
+    baseline = TransferValueNetwork(6, learning_rate_baseline)
 
-        for episode in range(max_episodes):
-            state = env.reset()[0]
-            zero_position = state[0]
-            episode_transitions = []
+    policy_mount = PolicyNetwork(6, 3, learning_rate, name='policy_network_MountainCarContinuous-v0')
+    baseline_mount = ValueNetwork(6, learning_rate_baseline, name='value_networkMountainCarContinuous-v0')
 
-            for step in range(max_steps):
-                state = state_zero_padding(state, env)
-                actions_distribution = sess.run(policy.actions_distribution, {policy.state: state})
-                actions_distribution = delete_output_padding(actions_distribution, env)
-                if type(actions_distribution) is np.float32:
-                    rand = np.random.rand()
-                    mountain_car_decay *= 0.99
-                    if mountain_car_decay > rand:
-                        rand = 2 * np.random.rand() - 1
-                        action = np.array([random.choice([rand, actions_distribution])])
-                    else:
-                        action = np.array([actions_distribution])
-                else:
-                    action = np.random.choice(np.arange(len(actions_distribution)), p=actions_distribution)
-                next_state, reward, done, _, _ = env.step(action)
-                next_state = next_state.reshape([1, state_size])
+    policy_Acrobot = PolicyNetwork(6, 3, learning_rate, name='policy_network_Acrobot-v1')
+    baseline_Acrobot = ValueNetwork(6, learning_rate_baseline, name='value_networkAcrobot-v1')
 
-                if env.spec.id == "MountainCarContinuous-v0":
-                    reward = reward_mountain_car(state,action, next_state)
+    # saver = tf.train.Saver()
+    # # Start training the agent with REINFORCE algorithm
+    # sess_mountain = tf.Session()
+    # saver.restore(sess_mountain, f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/MountainCarContinuous-v0/MountainCarContinuous-v0.ckpt")
+    # sess_Acrobot = tf.Session()
+    # saver.restore(sess_Acrobot,f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/Acrobot-v1/Acrobot-v1.ckpt")
+    saver1 = tf.train.Saver()
+    with tf.Session() as sess_mountain:
+        saver1.restore(sess_mountain, f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/MountainCarContinuous-v0/MountainCarContinuous-v0.ckpt")
 
-                if render:
-                    env.render()
-                value = sess.run(baseline.output, {baseline.state: state})
-                if env.spec.id != "MountainCarContinuous-v0":
-                    action_one_hot = np.zeros(action_size)
-                    action_one_hot[action] = 1
-                else:
-                    action_one_hot = action
-                episode_transitions.append(
-                    Transition(state=state, action=action_one_hot, reward=reward, next_state=next_state, done=done,
-                               value=value))
-                episode_rewards[episode] += reward
+        saver2 = tf.train.Saver()
+        with tf.Session() as sess_Acrobot:
+            saver2.restore(sess_Acrobot, f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/Acrobot-v1/Acrobot-v1.ckpt")
 
-                if done:
-                    if episode > 98:
-                        # Check if solved
-                        average_rewards = np.mean(episode_rewards[(episode - 99):episode + 1])
-                        avg_reward_history.append(average_rewards)
-                    print(
-                        "Episode {} Reward: {} Average over 100 episodes: {}".format(episode, episode_rewards[episode],
-                                                                                     round(average_rewards, 2)))
-                    if average_rewards > 475:
-                        print(' Solved at episode: ' + str(episode))
-                        solved = True
-                    break
-                state = next_state
+            with tf.Session() as sess:
+                sess.run(tf.global_variables_initializer())
 
-            if solved:
-                break
+                solved = False
+                Transition = collections.namedtuple("Transition", ["state", "action", "reward", "next_state", "done", "value"])
+                episode_rewards = np.zeros(max_episodes)
+                average_rewards = 0.0
+                avg_reward_history = []
 
-            # Compute Rt for each time-step t and update the network's weights
-            for t, transition in enumerate(episode_transitions):
-                total_discounted_return = sum(discount_factor ** i * t.reward for i, t in
-                                              enumerate(episode_transitions[t:])) - transition.value  # Rt - V(s)
-                transition_action = action_zero_padding(transition.action, env)
-                feed_dict = {policy.state: transition.state, policy.R_t: total_discounted_return,
-                             policy.action: transition_action}
-                _, loss = sess.run([policy.optimizer, policy.loss], feed_dict)
-                feed_dict = {baseline.state: transition.state, baseline.target: total_discounted_return}
-                _, loss = sess.run([baseline.optimizer, baseline.loss], feed_dict)
-            if episode % 50 == 0:
-                saver = tf.train.Saver()
-                save_path = saver.save(sess,
-                                       f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}/{env.spec.id}.ckpt")
-        with open('rewards_baseline.csv', 'w') as f:
-            csvwriter = csv.writer(f)
-            csvwriter.writerow(avg_reward_history)
+                for episode in range(max_episodes):
+                    state = env.reset()[0]
+                    zero_position = state[0]
+                    episode_transitions = []
+
+                    for step in range(max_steps):
+                        state = state_zero_padding(state, env)
+                        transfer_mountain = sess_mountain.run(policy_mount.output, {policy_mount.state: state})
+                        transfer_Acrobot = sess_Acrobot.run(policy_Acrobot.output, {policy_Acrobot.state: state})
+                        transfer = np.append(transfer_mountain, transfer_Acrobot)
+                        actions_distribution = sess.run(policy.actions_distribution, {policy.state: state, policy.Transfer: transfer})
+                        actions_distribution = delete_output_padding(actions_distribution, env)
+                        if type(actions_distribution) is np.float32:
+                            rand = np.random.rand()
+                            mountain_car_decay *= 0.99
+                            if mountain_car_decay > rand:
+                                rand = 2 * np.random.rand() - 1
+                                action = np.array([random.choice([rand, actions_distribution])])
+                            else:
+                                action = np.array([actions_distribution])
+                        else:
+                            action = np.random.choice(np.arange(len(actions_distribution)), p=actions_distribution)
+                        next_state, reward, done, _, _ = env.step(action)
+                        next_state = next_state.reshape([1, state_size])
+
+                        if env.spec.id == "MountainCarContinuous-v0":
+                            reward = reward_mountain_car(state,action, next_state)
+
+                        if render:
+                            env.render()
+                        value = sess.run(baseline.output, {baseline.state: state})
+                        if env.spec.id != "MountainCarContinuous-v0":
+                            action_one_hot = np.zeros(action_size)
+                            action_one_hot[action] = 1
+                        else:
+                            action_one_hot = action
+                        episode_transitions.append(
+                            Transition(state=state, action=action_one_hot, reward=reward, next_state=next_state, done=done,
+                                       value=value))
+                        episode_rewards[episode] += reward
+
+                        if done:
+                            if episode > 98:
+                                # Check if solved
+                                average_rewards = np.mean(episode_rewards[(episode - 99):episode + 1])
+                                avg_reward_history.append(average_rewards)
+                            print(
+                                "Episode {} Reward: {} Average over 100 episodes: {}".format(episode, episode_rewards[episode],
+                                                                                             round(average_rewards, 2)))
+                            if average_rewards > 475:
+                                print(' Solved at episode: ' + str(episode))
+                                solved = True
+                            break
+                        state = next_state
+
+                    if solved:
+                        break
+
+                    # Compute Rt for each time-step t and update the network's weights
+                    for t, transition in enumerate(episode_transitions):
+                        total_discounted_return = sum(discount_factor ** i * t.reward for i, t in
+                                                      enumerate(episode_transitions[t:])) - transition.value  # Rt - V(s)
+                        transition_action = action_zero_padding(transition.action, env)
+                        feed_dict = {policy.state: transition.state, policy.R_t: total_discounted_return,
+                                     policy.action: transition_action}
+                        _, loss = sess.run([policy.optimizer, policy.loss], feed_dict)
+                        feed_dict = {baseline.state: transition.state, baseline.target: total_discounted_return}
+                        _, loss = sess.run([baseline.optimizer, baseline.loss], feed_dict)
+                    if episode % 50 == 0:
+                        saver = tf.train.Saver()
+                        save_path = saver.save(sess,
+                                               f"/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/{env.spec.id}/{env.spec.id}.ckpt")
+                with open(f'rewards_baseline_{env.spec.id}.csv', 'w') as f:
+                    csvwriter = csv.writer(f)
+                    csvwriter.writerow(avg_reward_history)
 
 
 if __name__ == '__main__':
