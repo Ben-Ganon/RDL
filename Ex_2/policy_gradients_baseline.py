@@ -7,7 +7,12 @@ import csv
 tf.disable_v2_behavior()
 print("tf_ver:{}".format(tf.__version__))
 
-env = gym.make('CartPole-v1')
+# env = gym.make('CartPole-v1')
+render = False
+render_mode = "human" if render else None
+# env = gym.make('CartPole-v1', render_mode=render_mode)
+# env = gym.make('Acrobot-v1', render_mode=render_mode)
+env = gym.make('MountainCarContinuous-v0-v0', render_mode=render_mode)
 np.random.seed(1)
 
 class ValueNetwork:
