@@ -21,6 +21,7 @@ tf.set_random_seed(42)
 
 policy_layer = 12
 value_layer = 12
+transfer_layer = 36
 
 
 class ValueNetwork:
@@ -81,6 +82,32 @@ class PolicyNetwork:
             self.neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.output, labels=self.action)
             self.loss = tf.reduce_mean(self.neg_log_prob * self.R_t)
             self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
+
+
+class TransferPolicyNetwork:
+    def __init__(self, state_size, action_size, learning_rate, name='transfer_policy_network'):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.learning_rate = learning_rate
+
+        with tf.variable_scope(name):
+            self.state = tf.placeholder(tf.float32, [None, self.state_size], name="state")
+            self.action = tf.placeholder(tf.int32, [self.action_size], name="action")
+            self.R_t = tf.placeholder(tf.float32, name="total_rewards")
+            self.T1 = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer1")
+            self.T2 = tf.placeholder(tf.float32, [None, transfer_layer], name="transfer2")
+
+            tf2_initializer = tf.keras.initializers.glorot_normal(seed=0)
+            self.W1 = tf.get_variable("W1", [self.state_size, policy_layer], initializer=tf2_initializer)
+            self.b1 = tf.get_variable("b1", [policy_layer], initializer=tf2_initializer)
+            self.W2 = tf.get_variable("W2", [transfer_layer, policy_layer], initializer=tf2_initializer)
+            self.b2 = tf.get_variable("b2", [policy_layer], initializer=tf2_initializer)
+            self.W3 = tf.get_variable("W3", [transfer_layer, self.action_size], initializer=tf2_initializer)
+            self.b3 = tf.get_variable("b3", [self.action_size], initializer=tf2_initializer)
+
+            self.Z1 = tf.add(tf.matmul(self.state, self.W1), self.b1)
+            self.A1 = tf.nn.relu(self.Z1)
+
 
 
 def state_zero_padding(state, env):

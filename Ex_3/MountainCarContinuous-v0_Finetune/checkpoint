@@ -1,0 +1,2 @@
+model_checkpoint_path: "/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/MountainCarContinuous-v0_Finetune/MountainCarContinuous-v0_Finetune.ckpt"
+all_model_checkpoint_paths: "/Users/Administrator/PycharmProjects/RDL_ex3/Ex_3/MountainCarContinuous-v0_Finetune/MountainCarContinuous-v0_Finetune.ckpt"
